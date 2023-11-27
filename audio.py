@@ -138,24 +138,6 @@ def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, tec
             # print ('write wav', outfile)
 
         # Adapted from https://ankurdhuriya.medium.com/audio-enhancement-and-denoising-methods-3644f0cad85b
-        if technique == 'spectral_substraction_deprecated':
-            noisy_signal_file_path = f"./audio/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
-
-            noisy_audio, sr = librosa.load(noisy_signal_file_path)
-
-            noisy_spectrum = np.abs(librosa.stft(noisy_audio))
-
-            noise_spectrum = np.mean(noisy_spectrum, axis=1)
-            
-            alpha = 2.0
-            clean_spectrum = np.maximum(noise_spectrum - alpha * noise_spectrum, 0)
-
-            clean_audio = librosa.istft(clean_spectrum)
-
-            output_file_path = f"./audio/{keyword}_Subtraction/{keyword}_Subtraction_{index}.wav"
-            librosa.output.write_wav(output_file_path, clean_audio, sr)
-
-        # Adapted from https://ankurdhuriya.medium.com/audio-enhancement-and-denoising-methods-3644f0cad85b
         if technique == 'wiener_filter':
             noisy_signal_file_path = f"./audio/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
             if keyword == 'Yes':
