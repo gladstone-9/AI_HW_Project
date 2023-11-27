@@ -188,6 +188,34 @@ def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, tec
             output_file_path = f"{output_path}/{keyword}_HPF/{keyword}_HPF_{index}.wav"
             save_wav(output_file_path, filtered_signal_HPF, sampling_rate)
 
+        if technique == 'bandpass_filter':
+            low_pass_cutoff = 1000  # Hz
+            high_pass_cutoff = 100  # Hz
+
+            # Load audio from local file repo
+            audio = wave.open(wav_file_path)
+
+            # Get length of data and sampling rate in audio
+            audio_nframes = audio.getnframes()
+            sampling_rate = audio.getframerate()
+
+            # Copy samples from loaded file to a NumPy buffer, loaded as signed 16bit PCM
+            signal = np.frombuffer(audio.readframes(audio_nframes), dtype = np.int16)
+            signal = signal.astype(float)
+
+            # Overlay audio with noise and convert Audio Segment to np array
+            noisy_signal = overlay_audio(wav_file_path, noise_file_path)
+            noisy_signal = np.array(noisy_signal.get_array_of_samples())
+
+            # LPF Filter the Signal
+            filtered_signal_LPF = butter_lowpass_filter(noisy_signal, low_pass_cutoff, sampling_rate)
+
+            # HPF Filter the Signal
+            filtered_signal_bandpass = butter_highpass_filter(filtered_signal_LPF, high_pass_cutoff, sampling_rate)
+            # Write Noisy HPF audio to folder
+            output_file_path = f"{output_path}/{keyword}_Bandpass/{keyword}_Bandpass_{index}.wav"
+            save_wav(output_file_path, filtered_signal_bandpass, sampling_rate)
+
         # Delete, just so not much is processed right now.
         if index > 3:
             break
@@ -201,6 +229,11 @@ print("Data Created")
 process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "butterworth_filtering")
 process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "butterworth_filtering")
 print("Butterworth Filtering Finished")
+
+# Process Audio with Butterworth
+process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "bandpass_filter")
+process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "bandpass_filter")
+print("Bandpass Filtering Finished")
 
 yes_noisy_signal_folder_path = "./audio/Yes_Noisy"
 yes_noisy_signal_list = file_list(yes_noisy_signal_folder_path)
