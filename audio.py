@@ -14,6 +14,9 @@ import os
 import wave
 import numpy as np
 from scipy.io.wavfile import write
+import librosa
+import scipy
+import soundfile as sf
 
 '''
 Param: 
@@ -81,50 +84,160 @@ yes_stop_train_index = int(len(yes_list) * 0.8)     # First 80% for training dat
 no_stop_train_index = int(len(no_list) * 0.8)       # First 80% for training data
 
 
-def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword):
+def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, technique):
     # Processing for wav files in given folder
     for index, wav_file in enumerate(file_list[:stop_train_index]):
         wav_file_path = wav_folder_path + "/" + wav_file
         noise_file_path = noise_folder_path + "/" + noise_list[index]
 
-        # Load audio from local file repo
-        audio = wave.open(wav_file_path)
+        if technique == 'create_noisy_data':
+            # Load audio from local file repo
+            audio = wave.open(wav_file_path)
 
-        # Get length of data and sampling rate in audio
-        audio_nframes = audio.getnframes()
-        sampling_rate = audio.getframerate()
+            # Get sampling rate in audio
+            sampling_rate = audio.getframerate()
 
-        # Copy samples from loaded file to a NumPy buffer, loaded as signed 16bit PCM
-        signal = np.frombuffer(audio.readframes(audio_nframes), dtype = np.int16)
-        signal = signal.astype(float)
+            # Overlay audio with noise and convert Audio Segment to np array
+            noisy_signal = overlay_audio(wav_file_path, noise_file_path)
+            noisy_signal = np.array(noisy_signal.get_array_of_samples())
 
-        # Overlay audio with noise and convert Audio Segment to np array
-        noisy_signal = overlay_audio(wav_file_path, noise_file_path)
-        noisy_signal = np.array(noisy_signal.get_array_of_samples())
+            # Write Unfiltered Noisy Signal
+            output_file_path = f"{output_path}/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
+            save_wav(output_file_path, noisy_signal, sampling_rate)
+        
+        # Adapted from https://github.com/shun60s/spectral-subtraction/blob/master/ss1.py
+        if technique == 'spectral_substraction':
+            # edit following wav file name
+            infile= f"./audio/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
+            outfile= f"./audio/{keyword}_Subtraction/{keyword}_Subtraction_{index}.wav"
+            noisefile=f"./keywords/noise/{noise_list[index]}"
 
-        # Write Unfiltered Noisy Signal
-        output_file_path = f"{output_path}/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
-        save_wav(output_file_path, noisy_signal, sampling_rate)
+            # load input file, and stft (Short-time Fourier transform)
+            # print ('load wav', infile)
+            w, sr = librosa.load( infile, sr=None, mono=True) # keep native sr (sampling rate) and trans into mono
+            s= librosa.stft(w)    # Short-time Fourier transform
+            ss= np.abs(s)         # get magnitude
+            angle= np.angle(s)    # get phase
+            b=np.exp(1.0j* angle) # use this phase information when Inverse Transform
 
-        # LPF Filter the Signal
-        filtered_signal_LPF = butter_lowpass_filter(noisy_signal, LPF_cutoff_freq, sampling_rate)
-        # Write Noisy LPF audio to folder
-        output_file_path = f"{output_path}/{keyword}_LPF/{keyword}_LPF_{index}.wav"
-        save_wav(output_file_path, filtered_signal_LPF, sampling_rate)
+            # load noise only file, stft, and get mean
+            # print ('load wav', noisefile)
+            nw, nsr = librosa.load( noisefile, sr=None, mono=True)
+            ns= librosa.stft(nw) 
+            nss= np.abs(ns)
+            mns= np.mean(nss, axis=1) # get mean
 
-        # HPF Filter the Signal
-        filtered_signal_HPF = butter_highpass_filter(noisy_signal, HPF_cutoff_freq, sampling_rate)
-        # Write Noisy HPF audio to folder
-        output_file_path = f"{output_path}/{keyword}_HPF/{keyword}_HPF_{index}.wav"
-        save_wav(output_file_path, filtered_signal_HPF, sampling_rate)
+            # subtract noise spectral mean from input spectral, and istft (Inverse Short-Time Fourier Transform)
+            sa= ss - mns.reshape((mns.shape[0],1))  # reshape for broadcast to subtract
+            sa0= sa * b  # apply phase information
+            y= librosa.istft(sa0) # back to time domain signal
 
+            # save as a wav file
+            scipy.io.wavfile.write(outfile, sr, (y * 32768).astype(np.int16)) # save signed 16-bit WAV format
+            #librosa.output.write_wav(outfile, y , sr)  # save 32-bit floating-point WAV format, due to y is float 
+            # print ('write wav', outfile)
+
+        # Adapted from https://ankurdhuriya.medium.com/audio-enhancement-and-denoising-methods-3644f0cad85b
+        if technique == 'spectral_substraction_deprecated':
+            noisy_signal_file_path = f"./audio/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
+
+            noisy_audio, sr = librosa.load(noisy_signal_file_path)
+
+            noisy_spectrum = np.abs(librosa.stft(noisy_audio))
+
+            noise_spectrum = np.mean(noisy_spectrum, axis=1)
+            
+            alpha = 2.0
+            clean_spectrum = np.maximum(noise_spectrum - alpha * noise_spectrum, 0)
+
+            clean_audio = librosa.istft(clean_spectrum)
+
+            output_file_path = f"./audio/{keyword}_Subtraction/{keyword}_Subtraction_{index}.wav"
+            librosa.output.write_wav(output_file_path, clean_audio, sr)
+
+        # Adapted from https://ankurdhuriya.medium.com/audio-enhancement-and-denoising-methods-3644f0cad85b
+        if technique == 'wiener_filter':
+            noisy_signal_file_path = f"./audio/{keyword}_Noisy/{keyword}_Noisy_{index}.wav"
+            if keyword == 'Yes':
+                clean_signal_file_path = f"keywords/{keyword}/{yes_list[index]}"
+            else:
+                clean_signal_file_path = f"keywords/{keyword}/{no_list[index]}"
+
+            noise_audio, sr = librosa.load(noisy_signal_file_path)
+            clean_audio, sr = librosa.load(clean_signal_file_path)
+
+            noise_stft = np.abs(librosa.stft(noise_audio))
+            clean_stft = np.abs(librosa.stft(clean_audio))
+
+            wiener_filter = clean_stft**2 / (clean_stft**2 + noise_stft**2)
+
+            enhanced_stft = wiener_filter * noise_stft
+
+            enhanced_audio = librosa.istft(enhanced_stft)
+
+            output_file_path = f"./audio/{keyword}_Wiener/{keyword}_Wiener_{index}.wav"
+            sf.write(output_file_path, enhanced_audio, sr, 'PCM_16')
+
+        if technique == 'butterworth_filtering':
+            # Load audio from local file repo
+            audio = wave.open(wav_file_path)
+
+            # Get length of data and sampling rate in audio
+            audio_nframes = audio.getnframes()
+            sampling_rate = audio.getframerate()
+
+            # Copy samples from loaded file to a NumPy buffer, loaded as signed 16bit PCM
+            signal = np.frombuffer(audio.readframes(audio_nframes), dtype = np.int16)
+            signal = signal.astype(float)
+
+            # Overlay audio with noise and convert Audio Segment to np array
+            noisy_signal = overlay_audio(wav_file_path, noise_file_path)
+            noisy_signal = np.array(noisy_signal.get_array_of_samples())
+
+            # LPF Filter the Signal
+            filtered_signal_LPF = butter_lowpass_filter(noisy_signal, LPF_cutoff_freq, sampling_rate)
+            # Write Noisy LPF audio to folder
+            output_file_path = f"{output_path}/{keyword}_LPF/{keyword}_LPF_{index}.wav"
+            save_wav(output_file_path, filtered_signal_LPF, sampling_rate)
+
+            # HPF Filter the Signal
+            filtered_signal_HPF = butter_highpass_filter(noisy_signal, HPF_cutoff_freq, sampling_rate)
+            # Write Noisy HPF audio to folder
+            output_file_path = f"{output_path}/{keyword}_HPF/{keyword}_HPF_{index}.wav"
+            save_wav(output_file_path, filtered_signal_HPF, sampling_rate)
 
         # Delete, just so not much is processed right now.
         if index > 3:
             break
 
-process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes")
-process_wav_files(no_stop_train_index, no_list, no_folder_path, "No")
+# Create the Noisy Data
+process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "create_noisy_data")
+process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "create_noisy_data")
+print("Data Created")
+
+# Process Audio with Butterworth
+process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "butterworth_filtering")
+process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "butterworth_filtering")
+print("Butterworth Filtering Finished")
+
+yes_noisy_signal_folder_path = "./audio/Yes_Noisy"
+yes_noisy_signal_list = file_list(yes_noisy_signal_folder_path)
+no_noisy_signal_folder_path = "./audio/No_Noisy"
+no_noisy_signal_list = file_list(no_noisy_signal_folder_path)
+
+# Process Audio with Spectral Substraction 
+process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "spectral_substraction")
+process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "spectral_substraction")
+print("Spectral Substraction Finished")
+
+# Process Audio with Wiener Filtering
+process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "wiener_filter")
+process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "wiener_filter")
+print("Wiener Filtering Finished")
+
+
+
+
 
 
 
