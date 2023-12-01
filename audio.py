@@ -17,6 +17,7 @@ from scipy.io.wavfile import write
 import librosa
 import scipy
 import soundfile as sf
+import matplotlib.pyplot as plt
 
 '''
 Param: 
@@ -77,8 +78,8 @@ no_list = file_list(no_folder_path)
 noise_list = file_list(noise_folder_path)
 
 # Constants
-LPF_cutoff_freq = 5000 # Hz     //Change
-HPF_cutoff_freq = 1000 # Hz     //Change
+LPF_cutoff_freq = 600 # Hz     //Change
+HPF_cutoff_freq = 100 # Hz     //Change
 
 yes_stop_train_index = int(len(yes_list) * 0.8)     # First 80% for training data
 no_stop_train_index = int(len(no_list) * 0.8)       # First 80% for training data
@@ -177,20 +178,20 @@ def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, tec
             noisy_signal = np.array(noisy_signal.get_array_of_samples())
 
             # LPF Filter the Signal
-            filtered_signal_LPF = butter_lowpass_filter(noisy_signal, LPF_cutoff_freq, sampling_rate)
+            filtered_signal_LPF = butter_lowpass_filter(noisy_signal, LPF_cutoff_freq, sampling_rate, order=10)
             # Write Noisy LPF audio to folder
             output_file_path = f"{output_path}/{keyword}_LPF/{keyword}_LPF_{index}.wav"
             save_wav(output_file_path, filtered_signal_LPF, sampling_rate)
 
             # HPF Filter the Signal
-            filtered_signal_HPF = butter_highpass_filter(noisy_signal, HPF_cutoff_freq, sampling_rate)
+            filtered_signal_HPF = butter_highpass_filter(noisy_signal, HPF_cutoff_freq, sampling_rate, order=10)
             # Write Noisy HPF audio to folder
             output_file_path = f"{output_path}/{keyword}_HPF/{keyword}_HPF_{index}.wav"
             save_wav(output_file_path, filtered_signal_HPF, sampling_rate)
 
         if technique == 'bandpass_filter':
-            low_pass_cutoff = 1000  # Hz
-            high_pass_cutoff = 100  # Hz
+            low_pass_cutoff = 1200  # Hz
+            high_pass_cutoff = 130  # Hz
 
             # Load audio from local file repo
             audio = wave.open(wav_file_path)
@@ -208,10 +209,10 @@ def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, tec
             noisy_signal = np.array(noisy_signal.get_array_of_samples())
 
             # LPF Filter the Signal
-            filtered_signal_LPF = butter_lowpass_filter(noisy_signal, low_pass_cutoff, sampling_rate)
+            filtered_signal_LPF = butter_lowpass_filter(noisy_signal, low_pass_cutoff, sampling_rate, order=10)
 
             # HPF Filter the Signal
-            filtered_signal_bandpass = butter_highpass_filter(filtered_signal_LPF, high_pass_cutoff, sampling_rate)
+            filtered_signal_bandpass = butter_highpass_filter(filtered_signal_LPF, high_pass_cutoff, sampling_rate, order=10)
             # Write Noisy HPF audio to folder
             output_file_path = f"{output_path}/{keyword}_Bandpass/{keyword}_Bandpass_{index}.wav"
             save_wav(output_file_path, filtered_signal_bandpass, sampling_rate)
@@ -230,25 +231,121 @@ process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "butte
 process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "butterworth_filtering")
 print("Butterworth Filtering Finished")
 
-# Process Audio with Butterworth
+# Process Audio with Bandpass
 process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "bandpass_filter")
 process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "bandpass_filter")
 print("Bandpass Filtering Finished")
 
-yes_noisy_signal_folder_path = "./audio/Yes_Noisy"
-yes_noisy_signal_list = file_list(yes_noisy_signal_folder_path)
-no_noisy_signal_folder_path = "./audio/No_Noisy"
-no_noisy_signal_list = file_list(no_noisy_signal_folder_path)
+# yes_noisy_signal_folder_path = "./audio/Yes_Noisy"
+# yes_noisy_signal_list = file_list(yes_noisy_signal_folder_path)
+# no_noisy_signal_folder_path = "./audio/No_Noisy"
+# no_noisy_signal_list = file_list(no_noisy_signal_folder_path)
 
-# Process Audio with Spectral Substraction 
-process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "spectral_substraction")
-process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "spectral_substraction")
-print("Spectral Substraction Finished")
+# # Process Audio with Spectral Substraction 
+# process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "spectral_substraction")
+# process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "spectral_substraction")
+# print("Spectral Substraction Finished")
 
-# Process Audio with Wiener Filtering
-process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "wiener_filter")
-process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "wiener_filter")
-print("Wiener Filtering Finished")
+# # Process Audio with Wiener Filtering
+# process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "wiener_filter")
+# process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "wiener_filter")
+# print("Wiener Filtering Finished")
+
+
+def plot_waveform(wav_file_path, title):
+    # Load audio from local file repo
+    audio = wave.open(wav_file_path)
+
+    # Get length of data and sampling rate in audio
+    audio_nframes = audio.getnframes()
+
+    # Copy samples from loaded file to a NumPy buffer, loaded as signed 16bit PCM
+    signal = np.frombuffer(audio.readframes(audio_nframes), dtype = np.int16)
+    signal = signal.astype(float)
+
+    # Plot the entire song waveform
+    # plt.figure().set_figwidth(12)
+    plt.plot(signal)
+    plt.title(f'{title}')
+    plt.xlabel('Samples')
+    plt.ylabel('Signal')
+    # plt.show()
+
+def plot_fft_waveform(wav_file_path, title):
+    # FFT of Full Audio Signal
+    # Load audio from local file repo
+    audio = wave.open(wav_file_path)
+
+    # Get length of data and sampling rate in audio
+    audio_nframes = audio.getnframes()
+    sample_rate = audio.getframerate()
+
+    # Copy samples from loaded file to a NumPy buffer, loaded as signed 16bit PCM
+    signal = np.frombuffer(audio.readframes(audio_nframes), dtype = np.int16)
+    signal = signal.astype(float)
+
+    # Compute the FFT of the signal
+    song_bins = np.fft.rfft(signal)
+
+    # Take the absolute value of the amplitudes and rescale the data from 0 to 1 using the max bin value
+    song_bins_vals = abs(song_bins) * 1/np.max(abs(song_bins))
+
+    # Compute the frequency present in each bin
+    song_bin_freqs = np.arange(0,len(song_bins)) / (len(signal)*(1/sample_rate))
+
+    # Select an upper bin to restrict the view of the graph
+    select_freq = 1500 # Hz # EDIT THIS
+    closest_bin_index = np.argmin(np.abs(song_bin_freqs - select_freq))
+
+    # plt.figure().set_figwidth(12)
+    plt.plot(song_bin_freqs[:closest_bin_index], song_bins_vals[:closest_bin_index], label=f'{title}')
+    plt.title(f'{title}')
+    plt.xlabel('Hz')
+    plt.ylabel('|X[k]|')
+    # plt.show()
+
+# Plot Waveforms
+'''
+Types:
+plot_waveform("keywords\yes\yes.0a7c2a8d_nohash_0.wav","Yes Waveform")
+plot_waveform("keywords\\noise\\noise.doing_the_dishes.wav.0.wav","Noisy Waveform")
+plot_waveform("audio\Yes_Noisy\Yes_Noisy_0.wav","Yes Noisy Waveform")
+plot_waveform("audio\Yes_Wiener\Yes_Wiener_0.wav","Yes Wiener Waveform")
+plot_waveform("audio\Yes_Subtraction\Yes_Subtraction_0.wav","Yes Subtraction Waveform")
+'''
+
+# Plot FFTs
+'''
+Types:
+plot_fft_waveform("audio\Yes_HPF\Yes_HPF_0.wav","Yes HPF Waveform")
+plot_fft_waveform("audio\Yes_LPF\Yes_LPF_0.wav","Yes LPF Waveform")
+plot_fft_waveform("keywords\yes\yes.0a7c2a8d_nohash_0.wav","Yes Waveform")
+plot_fft_waveform("keywords\\noise\\noise.doing_the_dishes.wav.0.wav","Noisy Waveform")
+plot_fft_waveform("audio\Yes_Noisy\Yes_Noisy_0.wav","Yes Noisy Waveform")
+plot_fft_waveform("audio\Yes_Bandpass\Yes_Bandpass_0.wav","Yes Bandpass Waveform")
+plot_fft_waveform("audio\Yes_Wiener\Yes_Wiener_0.wav","Yes Wiener Waveform")
+plot_fft_waveform("audio\Yes_Subtraction\Yes_Subtraction_0.wav","Yes Subtraction Waveform")
+'''
+
+plt.figure().set_figwidth(12)
+plot_fft_waveform("keywords\\noise\\noise.doing_the_dishes.wav.0.wav","Noisy Waveform")
+plot_fft_waveform("audio\Yes_Noisy\Yes_Noisy_0.wav","Yes Noisy Waveform")
+plt.legend()
+plt.show()
+
+# plt.figure().set_figwidth(12)
+# plt.legend()
+# plt.show()
+
+
+
+
+
+
+
+
+
+
 
 
 
