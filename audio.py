@@ -85,6 +85,24 @@ HPF_cutoff_freq = 100 # Hz     //Change
 yes_stop_train_index = int(len(yes_list) * 0.8)     # First 80% for training data
 no_stop_train_index = int(len(no_list) * 0.8)       # First 80% for training data
 
+def write_clean_files_to_folder(stop_train_index, file_list, wav_folder_path, keyword):
+    for index, wav_file in enumerate(file_list[stop_train_index:]):
+        wav_file_path = wav_folder_path + "/" + wav_file
+        
+        # Load audio from local file repo
+        audio = wave.open(wav_file_path)
+
+        # Get length of data and sampling rate in audio
+        audio_nframes = audio.getnframes()
+        sampling_rate = audio.getframerate()
+
+        # Copy samples from loaded file to a NumPy buffer, loaded as signed 16bit PCM
+        signal = np.frombuffer(audio.readframes(audio_nframes), dtype = np.int16)
+        signal = signal.astype(float)
+
+        # Write Clean Signal
+        output_file_path = f"{output_path}/{keyword}_Validation/{keyword}_Validation_{index}.wav"
+        save_wav(output_file_path, signal, sampling_rate)
 
 def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, technique):
     # Processing for wav files in given folder
@@ -222,35 +240,40 @@ def process_wav_files(stop_train_index, file_list, wav_folder_path, keyword, tec
         if index >= 1500:
             break
 
-# Create the Noisy Data
-process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "create_noisy_data")
-process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "create_noisy_data")
-print("Data Created")
+# Move Validation Data to Folder
+write_clean_files_to_folder(yes_stop_train_index, yes_list, yes_folder_path, "Yes")
+write_clean_files_to_folder(no_stop_train_index, no_list, no_folder_path, "No")
+print("Validation Data Created")
 
-# # Process Audio with Butterworth
-# process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "butterworth_filtering")
-# process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "butterworth_filtering")
-# print("Butterworth Filtering Finished")
+# # Create the Noisy Data
+# process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "create_noisy_data")
+# process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "create_noisy_data")
+# print("Data Created")
 
-# Process Audio with Bandpass
-process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "bandpass_filter")
-process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "bandpass_filter")
-print("Bandpass Filtering Finished")
+# # # Process Audio with Butterworth
+# # process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "butterworth_filtering")
+# # process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "butterworth_filtering")
+# # print("Butterworth Filtering Finished")
 
-yes_noisy_signal_folder_path = "./audio/Yes_Noisy"
-yes_noisy_signal_list = file_list(yes_noisy_signal_folder_path)
-no_noisy_signal_folder_path = "./audio/No_Noisy"
-no_noisy_signal_list = file_list(no_noisy_signal_folder_path)
+# # Process Audio with Bandpass
+# process_wav_files(yes_stop_train_index, yes_list, yes_folder_path, "Yes", "bandpass_filter")
+# process_wav_files(no_stop_train_index, no_list, no_folder_path, "No", "bandpass_filter")
+# print("Bandpass Filtering Finished")
 
-# Process Audio with Spectral Substraction 
-process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "spectral_substraction")
-process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "spectral_substraction")
-print("Spectral Substraction Finished")
+# yes_noisy_signal_folder_path = "./audio/Yes_Noisy"
+# yes_noisy_signal_list = file_list(yes_noisy_signal_folder_path)
+# no_noisy_signal_folder_path = "./audio/No_Noisy"
+# no_noisy_signal_list = file_list(no_noisy_signal_folder_path)
 
-# Process Audio with Wiener Filtering
-process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "wiener_filter")
-process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "wiener_filter")
-print("Wiener Filtering Finished")
+# # Process Audio with Spectral Substraction 
+# process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "spectral_substraction")
+# process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "spectral_substraction")
+# print("Spectral Substraction Finished")
+
+# # Process Audio with Wiener Filtering
+# process_wav_files(yes_stop_train_index, yes_noisy_signal_list, yes_folder_path, "Yes", "wiener_filter")
+# process_wav_files(no_stop_train_index, no_noisy_signal_list, no_folder_path, "No", "wiener_filter")
+# print("Wiener Filtering Finished")
 
 
 def plot_waveform(wav_file_path, title):
@@ -328,21 +351,21 @@ plot_waveform("audio\Yes_Noisy\Yes_Noisy_0.wav","Yes Noisy Waveform")
 plot_waveform("audio\Yes_Wiener\Yes_Wiener_0.wav","Yes Wiener Waveform")
 plot_waveform("audio\Yes_Subtraction\Yes_Subtraction_0.wav","Yes Subtraction Waveform")
 '''
-plt.figure().set_figwidth(12)
-plot_waveform(f"audio\Yes_Noisy\Yes_Noisy_2.wav","Yes Noisy")
-plot_waveform(f"keywords\yes\{yes_list[2]}","Yes")
-plt.title('Clean and Noisy Keyword Waveform Comparison')
-plt.legend()
-plt.show()
+# plt.figure().set_figwidth(12)
+# plot_waveform(f"audio\Yes_Noisy\Yes_Noisy_2.wav","Yes Noisy")
+# plot_waveform(f"keywords\yes\{yes_list[2]}","Yes")
+# plt.title('Clean and Noisy Keyword Waveform Comparison')
+# plt.legend()
+# plt.show()
 
-plt.figure().set_figwidth(12)
-plot_waveform(f"keywords\yes\{yes_list[2]}","Yes")
-plot_waveform(f"audio\Yes_Bandpass\Yes_Bandpass_2.wav","Yes Bandpass")
-plot_waveform(f"audio\Yes_Subtraction\Yes_Subtraction_2.wav","Yes Subtraction")
-plot_waveform(f"audio\Yes_Wiener\Yes_Wiener_2.wav","Yes Wiener")
-plt.title('Noisy Keyword Waveform Filter Comparison')
-plt.legend()
-plt.show()
+# plt.figure().set_figwidth(12)
+# plot_waveform(f"keywords\yes\{yes_list[2]}","Yes")
+# plot_waveform(f"audio\Yes_Bandpass\Yes_Bandpass_2.wav","Yes Bandpass")
+# plot_waveform(f"audio\Yes_Subtraction\Yes_Subtraction_2.wav","Yes Subtraction")
+# plot_waveform(f"audio\Yes_Wiener\Yes_Wiener_2.wav","Yes Wiener")
+# plt.title('Noisy Keyword Waveform Filter Comparison')
+# plt.legend()
+# plt.show()
 
 
 # Plot FFTs
@@ -358,26 +381,26 @@ plot_fft_waveform("audio\Yes_Wiener\Yes_Wiener_0.wav","Yes Wiener")
 plot_fft_waveform("audio\Yes_Subtraction\Yes_Subtraction_0.wav","Yes Subtraction")
 '''
 
-plt.figure().set_figwidth(12)
-plot_fft_waveform("audio\Yes_Noisy\Yes_Noisy_2.wav","Yes Noisy")
-plot_fft_waveform(f"keywords\yes\{yes_list[2]}","Yes")
-plt.title('Clean and Noisy Keyword FFT Comparison')
-plt.legend()
-plt.show()
+# plt.figure().set_figwidth(12)
+# plot_fft_waveform("audio\Yes_Noisy\Yes_Noisy_2.wav","Yes Noisy")
+# plot_fft_waveform(f"keywords\yes\{yes_list[2]}","Yes")
+# plt.title('Clean and Noisy Keyword FFT Comparison')
+# plt.legend()
+# plt.show()
 
-plt.figure().set_figwidth(12)
-plot_fft_waveform("audio\Yes_Bandpass\Yes_Bandpass_2.wav","Yes Bandpass")
-plot_fft_waveform("audio\Yes_Subtraction\Yes_Subtraction_2.wav","Yes Subtraction")
-plot_fft_waveform("audio\Yes_Wiener\Yes_Wiener_2.wav","Yes Wiener")
-plot_fft_waveform(f"keywords\yes\{yes_list[2]}","Yes")
-plt.title('Noisy Keyword FFT Filter Comparison')
-plt.legend()
-plt.show()
+# plt.figure().set_figwidth(12)
+# plot_fft_waveform("audio\Yes_Bandpass\Yes_Bandpass_2.wav","Yes Bandpass")
+# plot_fft_waveform("audio\Yes_Subtraction\Yes_Subtraction_2.wav","Yes Subtraction")
+# plot_fft_waveform("audio\Yes_Wiener\Yes_Wiener_2.wav","Yes Wiener")
+# plot_fft_waveform(f"keywords\yes\{yes_list[2]}","Yes")
+# plt.title('Noisy Keyword FFT Filter Comparison')
+# plt.legend()
+# plt.show()
 
 # print(noise_list[2])
-print(len(yes_list))
-print(len(no_list))
-print(len(noise_list))
+# print(len(yes_list))
+# print(len(no_list))
+# print(len(noise_list))
 
 # print(yes_list[2])
 
